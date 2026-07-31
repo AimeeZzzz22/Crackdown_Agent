@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
-import '../widgets/bottom_nav_bar.dart';
 import '../models/goal_model.dart';
+import '../services/app_state.dart';
 import 'goal_detail_screen.dart';
+import 'new_goal_screen.dart';
 
 class GoalBoardScreen extends StatefulWidget {
   const GoalBoardScreen({super.key});
@@ -13,7 +14,7 @@ class GoalBoardScreen extends StatefulWidget {
 }
 
 class _GoalBoardScreenState extends State<GoalBoardScreen> {
-  final List<GoalModel> _goals = List.from(sampleGoals);
+  List<GoalModel> get _goals => AppState.instance.goals;
 
   @override
   Widget build(BuildContext context) {

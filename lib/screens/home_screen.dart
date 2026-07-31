@@ -4,6 +4,7 @@ import 'goal_board_screen.dart';
 import 'profile_screen.dart';
 import 'planning_screen.dart';
 import 'setting_screen.dart';
+import '../theme/colors.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
     GoalBoardScreen(),
     PlanningScreen(),
     ProfileScreen(),
-    _PlaceholderTab(label: 'Social', icon: Icons.people_outline),
   ];
 
   @override
@@ -51,7 +51,6 @@ class _HomeNavBar extends StatelessWidget {
       Icons.bolt_outlined,
       Icons.add_circle_outline,
       Icons.person_outline,
-      Icons.people_outline,
     ];
 
     return Container(

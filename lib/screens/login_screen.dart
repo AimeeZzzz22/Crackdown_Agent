@@ -34,7 +34,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (errors.isNotEmpty) {
-      showValidationDialog(context, errors);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errors.first,
+              style: const TextStyle(color: Colors.white, fontSize: 14)),
+          backgroundColor: const Color(0xFFC0392B),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
       return;
     }
 

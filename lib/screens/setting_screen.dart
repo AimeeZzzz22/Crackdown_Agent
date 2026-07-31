@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
-import '../widgets/bottom_nav_bar.dart';
 import 'notification_setting_screen.dart';
 import 'privacy_screen.dart';
 import 'profile_screen.dart';
@@ -14,16 +13,10 @@ class SettingScreen extends StatefulWidget {
 }
 
 class _SettingScreenState extends State<SettingScreen> {
-  int _navIndex = 3;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kSettingBodyBg,
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
-      ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

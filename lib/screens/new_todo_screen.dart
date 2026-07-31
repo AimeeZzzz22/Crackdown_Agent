@@ -29,7 +29,8 @@ class _NewTodoScreenState extends State<NewTodoScreen> {
 
   String? _selectedGoal;
   bool _goalExpanded = false;
-  final List<String> _goals = ['Goal 1', 'Goal 2', 'Goal 3'];
+  List<String> get _goals =>
+      AppState.instance.goals.map((g) => g.name).toList();
 
   bool _tagFocused = false;
   final List<String> _suggestedTags = ['School', 'fun', 'work', 'life'];

@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
-import '../widgets/bottom_nav_bar.dart';
+import '../services/app_state.dart';
+import '../models/goal_model.dart';
 import 'edit_todo_screen.dart';
 import 'edit_event_screen.dart';
+import 'new_todo_screen.dart';
+import 'new_event_screen.dart';
 
-// Simple data models
+// ── Data model ────────────────────────────────────────────────────────────────
+
 class CalendarTask {
-  final String id; // Unique identifier for the task
+  final String id;
   final String title;
   final String tag;
-  final String? time; // e.g. "8AM" - optional
-  final DateTime? date; // Specific date for this task - null means show on all dates
-  final DateTime createdAt; // For ordering tasks created first
+  final String? time;
+  final DateTime? date;
+  final DateTime createdAt;
   final Color? goalColor;
-  final bool isEvent; // true for event, false for todo
+  final bool isEvent;
   bool completed;
 
   CalendarTask({
@@ -27,25 +31,23 @@ class CalendarTask {
     this.goalColor,
     this.isEvent = false,
     this.completed = false,
-  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-       createdAt = createdAt ?? DateTime.now();
+  })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+        createdAt = createdAt ?? DateTime.now();
 
-  // Helper to parse time for sorting (e.g., "8AM" -> 8, "1PM" -> 13)
   int? get timeValue {
-    if (time == null) return null;
-    final timeStr = time!.toUpperCase();
-    final match = RegExp(r'(\d+)(AM|PM)?').firstMatch(timeStr);
-    if (match == null) return null;
-
-    int hour = int.tryParse(match.group(1) ?? '0') ?? 0;
-    final period = match.group(2);
-
-    if (period == 'PM' && hour != 12) hour += 12;
-    if (period == 'AM' && hour == 12) hour = 0;
-
-    return hour;
+    if (time == null || time!.isEmpty) return null;
+    final s = time!.toUpperCase();
+    final m = RegExp(r'(\d+)(AM|PM)?').firstMatch(s);
+    if (m == null) return null;
+    int h = int.tryParse(m.group(1) ?? '0') ?? 0;
+    final p = m.group(2);
+    if (p == 'PM' && h != 12) h += 12;
+    if (p == 'AM' && h == 12) h = 0;
+    return h;
   }
 }
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -55,96 +57,111 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  final DateTime _currentMonth = DateTime(2023, 12);
-  DateTime _selectedDay = DateTime(2023, 12, 2);
+  late DateTime _currentMonth;
+  late DateTime _selectedDay;
   bool _completedExpanded = true;
   final _searchController = TextEditingController();
 
-  // Sample tasks with various dates and times
-  final List<CalendarTask> _tasks = [
-    // Tasks for December 2
-    CalendarTask(
-      title: 'Schedule the meeting with\nMckinley Health Center',
-      tag: '# phone num: 217·······',
-      time: '8AM',
-      date: DateTime(2023, 12, 2),
-      createdAt: DateTime(2023, 12, 1, 9, 0),
-      goalColor: null,
-      isEvent: true,
-      completed: true,
-    ),
-    CalendarTask(
-      title: 'Math 231 Lecture',
-      tag: '# Bring the textbook',
-      time: '9AM',
-      date: DateTime(2023, 12, 2),
-      createdAt: DateTime(2023, 12, 1, 10, 0),
-      goalColor: null,
-      isEvent: true,
-    ),
-    CalendarTask(
-      title: 'Finish the Econ HW',
-      tag: '# Achieve • Reading',
-      time: '1PM',
-      date: DateTime(2023, 12, 2),
-      createdAt: DateTime(2023, 12, 1, 11, 0),
-      goalColor: const Color(0xFFE57373),
-      isEvent: false,
-    ),
-    CalendarTask(
-      title: 'Revise the Resume',
-      tag: '# Adding the updated activities',
-      time: '3PM',
-      date: DateTime(2023, 12, 2),
-      createdAt: DateTime(2023, 12, 1, 12, 0),
-      goalColor: const Color(0xFFB0BEC5),
-      isEvent: false,
-    ),
-    // Task without time (should appear at top)
-    CalendarTask(
-      title: 'Review Goals',
-      tag: '# Weekly review',
-      time: null, // No time
-      date: DateTime(2023, 12, 2),
-      createdAt: DateTime(2023, 12, 1, 8, 0),
-      goalColor: const Color(0xFF81C784),
-      isEvent: false,
-    ),
-    // Task without date (shows on all dates)
-    CalendarTask(
-      title: 'Daily Meditation',
-      tag: '# Mindfulness',
-      time: null,
-      date: null, // No specific date - shows on all days
-      createdAt: DateTime(2023, 11, 30),
-      goalColor: const Color(0xFF64B5F6),
-      isEvent: false,
-    ),
-    // Tasks for other dates
-    CalendarTask(
-      title: 'Project Meeting',
-      tag: '# Team sync',
-      time: '2PM',
-      date: DateTime(2023, 12, 8),
-      createdAt: DateTime(2023, 12, 7),
-      goalColor: null,
-      isEvent: true,
-    ),
-    CalendarTask(
-      title: 'Gym Session',
-      tag: '# Fitness',
-      time: null,
-      date: DateTime(2023, 12, 15),
-      createdAt: DateTime(2023, 12, 14),
-      goalColor: const Color(0xFFE57373),
-      isEvent: false,
-    ),
-  ];
+  // Sample / demo tasks (always visible for demo purposes)
+  final List<CalendarTask> _sampleTasks = [];
 
-  // Get days with events dynamically
-  Set<int> get _daysWithEvents {
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _currentMonth = DateTime(now.year, now.month);
+    _selectedDay = now;
+    AppState.instance.addListener(_onStateChange);
+
+    // Seed a few demo tasks on today for first-time visitors
+    final today = DateTime(now.year, now.month, now.day);
+    _sampleTasks.addAll([
+      CalendarTask(
+        id: 'demo_1',
+        title: 'Review your goals',
+        tag: '# Daily check-in',
+        time: '9AM',
+        date: today,
+        createdAt: today,
+        goalColor: const Color(0xFF9E9E9E),
+        isEvent: false,
+      ),
+      CalendarTask(
+        id: 'demo_2',
+        title: 'Plan your week',
+        tag: '# Productivity',
+        time: null,
+        date: today,
+        createdAt: today,
+        goalColor: const Color(0xFF64B5F6),
+        isEvent: false,
+      ),
+    ]);
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onStateChange);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onStateChange() => setState(() {});
+
+  // Convert AppState todos + events into CalendarTask list
+  List<CalendarTask> get _appStateTasks {
+    final tasks = <CalendarTask>[];
+    final appState = AppState.instance;
+
+    // Map goal name → color for coloring tasks
+    final goalColors = <String, Color>{};
+    for (final g in appState.goals) {
+      goalColors[g.name] = g.color;
+    }
+
+    // Todos
+    for (final todo in appState.todos) {
+      tasks.add(CalendarTask(
+        id: 'todo_${todo.id}',
+        title: todo.title,
+        tag: todo.tag.isNotEmpty ? '# ${todo.tag}' : todo.repeat != 'Never' ? '# ${todo.repeat}' : '',
+        time: null,
+        date: todo.date,
+        createdAt: todo.date ?? DateTime.now(),
+        goalColor: todo.goalName != null ? goalColors[todo.goalName] : null,
+        isEvent: false,
+        completed: todo.completed,
+      ));
+    }
+
+    // Events
+    for (final event in appState.events) {
+      tasks.add(CalendarTask(
+        id: 'event_${event.id}',
+        title: event.title,
+        tag: event.tag.isNotEmpty
+            ? '# ${event.tag}'
+            : event.location.isNotEmpty
+                ? '# ${event.location}'
+                : '',
+        time: event.startTime.isNotEmpty ? event.startTime : null,
+        date: event.date,
+        createdAt: event.date ?? DateTime.now(),
+        goalColor: null,
+        isEvent: true,
+        completed: false,
+      ));
+    }
+
+    return tasks;
+  }
+
+  List<CalendarTask> get _allTasks => [..._sampleTasks, ..._appStateTasks];
+
+  // Dots on calendar — any day that has tasks
+  Set<int> get _daysWithTasks {
     final days = <int>{};
-    for (var task in _tasks) {
+    for (final task in _allTasks) {
       if (task.date != null &&
           task.date!.month == _currentMonth.month &&
           task.date!.year == _currentMonth.year) {
@@ -154,145 +171,181 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return days;
   }
 
-  // Filter tasks for the selected date
   List<CalendarTask> get _filteredTasks {
-    return _tasks.where((task) {
-      // Include tasks without dates (they appear on all days)
-      if (task.date == null) return true;
-
-      // Include tasks that match the selected day
-      return task.date!.year == _selectedDay.year &&
-          task.date!.month == _selectedDay.month &&
-          task.date!.day == _selectedDay.day;
+    final query = _searchController.text.trim().toLowerCase();
+    return _allTasks.where((t) {
+      final matchesDate = t.date == null ||
+          (t.date!.year == _selectedDay.year &&
+              t.date!.month == _selectedDay.month &&
+              t.date!.day == _selectedDay.day);
+      final matchesSearch = query.isEmpty ||
+          t.title.toLowerCase().contains(query) ||
+          t.tag.toLowerCase().contains(query);
+      return matchesDate && matchesSearch;
     }).toList();
   }
 
-  // Sort tasks: no-time first (by creation), then by time
-  List<CalendarTask> _sortTasks(List<CalendarTask> tasks) {
-    final sorted = List<CalendarTask>.from(tasks);
-    sorted.sort((a, b) {
-      // Both have no time - sort by creation time
+  List<CalendarTask> _sorted(List<CalendarTask> tasks) {
+    final out = List<CalendarTask>.from(tasks);
+    out.sort((a, b) {
       if (a.timeValue == null && b.timeValue == null) {
         return a.createdAt.compareTo(b.createdAt);
       }
-      // a has no time - comes first
       if (a.timeValue == null) return -1;
-      // b has no time - comes first
       if (b.timeValue == null) return 1;
-      // Both have time - sort by time, then by creation
-      final timeCompare = a.timeValue!.compareTo(b.timeValue!);
-      if (timeCompare != 0) return timeCompare;
-      return a.createdAt.compareTo(b.createdAt);
+      return a.timeValue!.compareTo(b.timeValue!);
     });
-    return sorted;
+    return out;
   }
 
-  List<CalendarTask> get _completedTasks =>
-      _sortTasks(_filteredTasks.where((t) => t.completed).toList());
   List<CalendarTask> get _incompleteTasks =>
-      _sortTasks(_filteredTasks.where((t) => !t.completed).toList());
+      _sorted(_filteredTasks.where((t) => !t.completed).toList());
+  List<CalendarTask> get _completedTasks =>
+      _sorted(_filteredTasks.where((t) => t.completed).toList());
 
-  // Handle task update - remove old task and add updated one
-  void _updateTask(String taskId, Map<String, dynamic> updatedData) {
+  void _prevMonth() => setState(() {
+        _currentMonth =
+            DateTime(_currentMonth.year, _currentMonth.month - 1);
+      });
+
+  void _nextMonth() => setState(() {
+        _currentMonth =
+            DateTime(_currentMonth.year, _currentMonth.month + 1);
+      });
+
+  void _updateTask(String taskId, Map<String, dynamic> data) {
     setState(() {
-      // Remove the old task
-      _tasks.removeWhere((task) => task.id == taskId);
-
-      // Create updated task with the same ID
-      final newTask = CalendarTask(
-        id: taskId,
-        title: updatedData['title'] ?? '',
-        tag: '#${updatedData['tag'] ?? ''}',
-        time: updatedData['startTime'] ?? updatedData['time'],
-        date: updatedData['date'],
-        goalColor: null, // Preserve or update as needed
-        isEvent: updatedData.containsKey('startTime'), // If has startTime, it's an event
-        completed: false,
-      );
-
-      // Add the updated task
-      _tasks.add(newTask);
+      final idx = _sampleTasks.indexWhere((t) => t.id == taskId);
+      if (idx != -1) {
+        final old = _sampleTasks[idx];
+        _sampleTasks[idx] = CalendarTask(
+          id: taskId,
+          title: data['title'] ?? old.title,
+          tag: data['tag'] != null ? '#${data['tag']}' : old.tag,
+          time: data['startTime'] ?? data['time'] ?? old.time,
+          date: data['date'] ?? old.date,
+          goalColor: old.goalColor,
+          isEvent: old.isEvent,
+          completed: old.completed,
+        );
+      }
+      // AppState tasks: update the underlying AppState item
+      if (taskId.startsWith('todo_')) {
+        final id = taskId.replaceFirst('todo_', '');
+        final t = AppState.instance.todos.firstWhere(
+          (t) => t.id == id,
+          orElse: () => TodoItem(id: '', title: ''),
+        );
+        if (t.id.isNotEmpty) {
+          t.title = data['title'] ?? t.title;
+          t.date = data['date'] ?? t.date;
+          t.tag = data['tag'] ?? t.tag;
+          AppState.instance.notifyListeners();
+        }
+      }
     });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kCalendarBg,
+      floatingActionButton: _AddButton(selectedDay: _selectedDay),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Search tag bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Container(
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: GoogleFonts.epilogue(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Search Tag',
-                      hintStyle: GoogleFonts.epilogue(
-                          fontSize: 13, color: kCalendarGray),
-                      prefixIcon:
-                          Icon(Icons.search, size: 18, color: kCalendarGray),
-                      border: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.symmetric(vertical: 8),
-                    ),
+        child: Column(
+          children: [
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  style: GoogleFonts.epilogue(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search tasks & events',
+                    hintStyle:
+                        GoogleFonts.epilogue(fontSize: 13, color: kCalendarGray),
+                    prefixIcon:
+                        Icon(Icons.search, size: 18, color: kCalendarGray),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                 ),
               ),
+            ),
 
-              // Month name
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _monthName(_currentMonth.month),
-                    style: GoogleFonts.merriweather(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
+            // Month header with arrows — swipeable
+            GestureDetector(
+              onHorizontalDragEnd: (d) {
+                if (d.primaryVelocity == null) return;
+                if (d.primaryVelocity! < -200) _nextMonth();
+                if (d.primaryVelocity! > 200) _prevMonth();
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _prevMonth,
+                      child: const Icon(Icons.chevron_left, size: 28),
                     ),
-                  ),
+                    Expanded(
+                      child: Text(
+                        '${_monthName(_currentMonth.month)} ${_currentMonth.year}',
+                        style: GoogleFonts.merriweather(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _nextMonth,
+                      child: const Icon(Icons.chevron_right, size: 28),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
-              // Calendar grid
-              Padding(
+            // Calendar grid — swipe left/right to change month
+            GestureDetector(
+              onHorizontalDragEnd: (d) {
+                if (d.primaryVelocity == null) return;
+                if (d.primaryVelocity! < -200) _nextMonth();
+                if (d.primaryVelocity! > 200) _prevMonth();
+              },
+              child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: _CalendarGrid(
                   month: _currentMonth,
                   selectedDay: _selectedDay,
-                  daysWithEvents: _daysWithEvents,
+                  daysWithTasks: _daysWithTasks,
                   onDaySelected: (d) => setState(() => _selectedDay = d),
                 ),
               ),
-              const SizedBox(height: 8),
+            ),
 
-              // Task list
-              Container(
-                decoration: BoxDecoration(
-                  color: kCalendarCompleted,
+            const SizedBox(height: 8),
+
+            // Task list — scrollable
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEEEEEE),
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
+                      BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-                child: Column(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 80),
                   children: [
-                    // Completed section (collapsible)
+                    // Completed section
                     if (_completedTasks.isNotEmpty) ...[
                       GestureDetector(
                         onTap: () => setState(
@@ -308,54 +361,126 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     ? Icons.keyboard_arrow_up
                                     : Icons.keyboard_arrow_down,
                                 size: 18,
-                                color: Colors.black,
                               ),
                               const SizedBox(width: 4),
-                              Text('Completed',
+                              Text('Completed (${_completedTasks.length})',
                                   style: GoogleFonts.epilogue(
                                       fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black)),
+                                      fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ),
                       ),
                       if (_completedExpanded)
-                        ..._completedTasks
-                            .map((t) => _TaskRow(
-                                  task: t,
-                                  onToggle: () {
-                                    setState(() => t.completed = !t.completed);
-                                  },
-                                  onUpdate: _updateTask,
-                                )),
-                    ],
-
-                    // Incomplete tasks by time
-                    ..._incompleteTasks
-                        .map((t) => _TaskRow(
+                        ..._completedTasks.map((t) => _TaskRow(
                               task: t,
-                              onToggle: () {
-                                setState(() => t.completed = !t.completed);
-                              },
+                              onToggle: () => setState(() {
+                                t.completed = !t.completed;
+                                // sync to AppState if it's an AppState todo
+                                if (t.id.startsWith('todo_')) {
+                                  final id = t.id.replaceFirst('todo_', '');
+                                  AppState.instance.toggleTodo(id);
+                                }
+                              }),
                               onUpdate: _updateTask,
                             )),
-                    const SizedBox(height: 8),
+                    ],
+
+                    // Active tasks
+                    if (_incompleteTasks.isEmpty && _completedTasks.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            'No tasks for this day.\nTap + to add one!',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.epilogue(
+                                fontSize: 14, color: Colors.black45),
+                          ),
+                        ),
+                      ),
+
+                    ..._incompleteTasks.map((t) => _TaskRow(
+                          task: t,
+                          onToggle: () => setState(() {
+                            t.completed = !t.completed;
+                            if (t.id.startsWith('todo_')) {
+                              final id = t.id.replaceFirst('todo_', '');
+                              AppState.instance.toggleTodo(id);
+                            }
+                          }),
+                          onUpdate: _updateTask,
+                        )),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  String _monthName(int m) => [
+  String _monthName(int m) => const [
         '',
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
       ][m];
+}
+
+// ── Add FAB ───────────────────────────────────────────────────────────────────
+
+class _AddButton extends StatelessWidget {
+  final DateTime selectedDay;
+  const _AddButton({required this.selectedDay});
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton(
+      backgroundColor: const Color(0xFF2D1B5E),
+      child: const Icon(Icons.add, color: Colors.white),
+      onPressed: () {
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (_) => Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.check_box_outlined),
+                  title: Text('Add To-Do',
+                      style: GoogleFonts.epilogue(fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const NewTodoScreen()));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.event_outlined),
+                  title: Text('Add Event',
+                      style: GoogleFonts.epilogue(fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const NewEventScreen()));
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 // ── Calendar Grid ─────────────────────────────────────────────────────────────
@@ -363,13 +488,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
 class _CalendarGrid extends StatelessWidget {
   final DateTime month;
   final DateTime selectedDay;
-  final Set<int> daysWithEvents;
+  final Set<int> daysWithTasks;
   final ValueChanged<DateTime> onDaySelected;
 
   const _CalendarGrid({
     required this.month,
     required this.selectedDay,
-    required this.daysWithEvents,
+    required this.daysWithTasks,
     required this.onDaySelected,
   });
 
@@ -377,12 +502,13 @@ class _CalendarGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final firstDay = DateTime(month.year, month.month, 1);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final startWeekday = firstDay.weekday % 7; // 0=Sun
+    final startWeekday = firstDay.weekday % 7;
     final today = DateTime.now();
+    final totalCells = startWeekday + daysInMonth;
+    final gridCount = totalCells + (7 - totalCells % 7) % 7;
 
     return Column(
       children: [
-        // Day headers
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
@@ -406,23 +532,29 @@ class _CalendarGrid extends StatelessWidget {
             crossAxisCount: 7,
             childAspectRatio: 1.1,
           ),
-          itemCount: startWeekday + daysInMonth + (7 - (startWeekday + daysInMonth) % 7) % 7,
+          itemCount: gridCount,
           itemBuilder: (_, i) {
-            // Prev/next month overflow days
             if (i < startWeekday) {
-              final prevMonthDays =
-                  DateTime(month.year, month.month, 0).day;
-              final day = prevMonthDays - startWeekday + i + 1;
+              final prevDays = DateTime(month.year, month.month, 0).day;
               return _DayCell(
-                  day: day, isCurrentMonth: false, isToday: false,
-                  isSelected: false, hasDot: false, onTap: () {});
+                day: prevDays - startWeekday + i + 1,
+                isCurrentMonth: false,
+                isToday: false,
+                isSelected: false,
+                hasDot: false,
+                onTap: () {},
+              );
             }
             final day = i - startWeekday + 1;
             if (day > daysInMonth) {
-              final overflow = day - daysInMonth;
               return _DayCell(
-                  day: overflow, isCurrentMonth: false, isToday: false,
-                  isSelected: false, hasDot: false, onTap: () {});
+                day: day - daysInMonth,
+                isCurrentMonth: false,
+                isToday: false,
+                isSelected: false,
+                hasDot: false,
+                onTap: () {},
+              );
             }
             final date = DateTime(month.year, month.month, day);
             final isToday = date.year == today.year &&
@@ -436,7 +568,7 @@ class _CalendarGrid extends StatelessWidget {
               isCurrentMonth: true,
               isToday: isToday,
               isSelected: isSelected,
-              hasDot: daysWithEvents.contains(day),
+              hasDot: daysWithTasks.contains(day),
               onTap: () => onDaySelected(date),
             );
           },
@@ -448,10 +580,7 @@ class _CalendarGrid extends StatelessWidget {
 
 class _DayCell extends StatelessWidget {
   final int day;
-  final bool isCurrentMonth;
-  final bool isToday;
-  final bool isSelected;
-  final bool hasDot;
+  final bool isCurrentMonth, isToday, isSelected, hasDot;
   final VoidCallback onTap;
 
   const _DayCell({
@@ -465,9 +594,6 @@ class _DayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color textColor = isCurrentMonth ? Colors.black : kCalendarGray;
-    FontWeight fontWeight = isToday ? FontWeight.w900 : FontWeight.w400;
-
     return GestureDetector(
       onTap: isCurrentMonth ? onTap : null,
       child: Column(
@@ -478,15 +604,23 @@ class _DayCell extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isSelected ? Colors.black : Colors.transparent,
+              color: isSelected
+                  ? const Color(0xFF2D1B5E)
+                  : isToday
+                      ? const Color(0xFF2D1B5E).withValues(alpha: 0.15)
+                      : Colors.transparent,
             ),
             child: Center(
               child: Text(
                 '$day',
                 style: GoogleFonts.epilogue(
                   fontSize: 14,
-                  fontWeight: fontWeight,
-                  color: isSelected ? Colors.white : textColor,
+                  fontWeight: isToday ? FontWeight.w900 : FontWeight.w400,
+                  color: isSelected
+                      ? Colors.white
+                      : isCurrentMonth
+                          ? Colors.black
+                          : kCalendarGray,
                 ),
               ),
             ),
@@ -495,9 +629,9 @@ class _DayCell extends StatelessWidget {
             Container(
               width: 4,
               height: 4,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.black,
+                color: isSelected ? Colors.white : const Color(0xFF2D1B5E),
               ),
             ),
         ],
@@ -513,23 +647,18 @@ class _TaskRow extends StatelessWidget {
   final VoidCallback onToggle;
   final Function(String, Map<String, dynamic>) onUpdate;
 
-  const _TaskRow({
-    required this.task,
-    required this.onToggle,
-    required this.onUpdate,
-  });
+  const _TaskRow(
+      {required this.task, required this.onToggle, required this.onUpdate});
 
-  Future<void> _openEditScreen(BuildContext context) async {
-    Map<String, dynamic>? updatedData;
-
+  Future<void> _openEdit(BuildContext context) async {
+    Map<String, dynamic>? result;
     if (task.isEvent) {
-      // Navigate to Edit Event Screen and await result
-      updatedData = await Navigator.push(
+      result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => EditEventScreen(
             initialTitle: task.title,
-            initialDate: task.date, // Use actual task date (can be null)
+            initialDate: task.date,
             initialStartTime: task.time ?? '',
             initialEndTime: '',
             initialLocation: '',
@@ -540,13 +669,12 @@ class _TaskRow extends StatelessWidget {
         ),
       );
     } else {
-      // Navigate to Edit Todo Screen and await result
-      updatedData = await Navigator.push(
+      result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => EditTodoScreen(
             initialTitle: task.title,
-            initialDate: task.date, // Use actual task date (can be null)
+            initialDate: task.date,
             initialNotes: '',
             initialRepeat: 'Never',
             initialTag: task.tag.replaceAll('#', '').trim(),
@@ -554,11 +682,7 @@ class _TaskRow extends StatelessWidget {
         ),
       );
     }
-
-    // If data was returned (user clicked Update), call the update callback
-    if (updatedData != null) {
-      onUpdate(task.id, updatedData);
-    }
+    if (result != null) onUpdate(task.id, result);
   }
 
   @override
@@ -568,21 +692,22 @@ class _TaskRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Time label
           SizedBox(
-            width: 40,
+            width: 44,
             child: Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(task.time ?? '',
-                  style: GoogleFonts.epilogue(
-                      fontSize: 11, color: kCalendarGray)),
+              padding: const EdgeInsets.only(top: 14),
+              child: Text(
+                task.time ?? '',
+                style:
+                    GoogleFonts.epilogue(fontSize: 11, color: kCalendarGray),
+                textAlign: TextAlign.right,
+              ),
             ),
           ),
-          const SizedBox(width: 4),
-          // Task card - Make it clickable
+          const SizedBox(width: 6),
           Expanded(
             child: GestureDetector(
-              onTap: () => _openEditScreen(context),
+              onTap: () => _openEdit(context),
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -600,14 +725,15 @@ class _TaskRow extends StatelessWidget {
                             GestureDetector(
                               onTap: onToggle,
                               child: Padding(
-                                padding: const EdgeInsets.only(top: 2, right: 8),
+                                padding:
+                                    const EdgeInsets.only(top: 2, right: 8),
                                 child: Icon(
                                   task.completed
                                       ? Icons.check_circle
                                       : Icons.radio_button_unchecked,
                                   size: 18,
                                   color: task.completed
-                                      ? Colors.black
+                                      ? const Color(0xFF2D1B5E)
                                       : kCalendarGray,
                                 ),
                               ),
@@ -616,20 +742,43 @@ class _TaskRow extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(task.title,
-                                      style: GoogleFonts.merriweather(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black,
-                                        decoration: task.completed
-                                            ? TextDecoration.lineThrough
-                                            : null,
-                                      )),
-                                  const SizedBox(height: 2),
-                                  Text(task.tag,
-                                      style: GoogleFonts.epilogue(
-                                          fontSize: 11,
-                                          color: kCalendarTaskText)),
+                                  Text(
+                                    task.title,
+                                    style: GoogleFonts.merriweather(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black,
+                                      decoration: task.completed
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                  if (task.tag.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(task.tag,
+                                        style: GoogleFonts.epilogue(
+                                            fontSize: 11,
+                                            color: kCalendarTaskText)),
+                                  ],
+                                  if (task.isEvent)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF2D1B5E)
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text('Event',
+                                            style: GoogleFonts.epilogue(
+                                                fontSize: 10,
+                                                color:
+                                                    const Color(0xFF2D1B5E))),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -637,7 +786,6 @@ class _TaskRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Goal color bar
                     if (task.goalColor != null)
                       Container(
                         width: 6,
