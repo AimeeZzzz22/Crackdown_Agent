@@ -1,0 +1,16 @@
+# Only keep web build output at root — ignore everything else
+.dart_tool/
+build/
+android/
+ios/
+macos/
+linux/
+windows/
+lib/
+test/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+*.md
+.flutter-plugins*
+.last_build_id
