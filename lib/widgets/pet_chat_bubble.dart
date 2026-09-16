@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/agent_service.dart';
 
-enum BubbleState { idle, listening, loading, replied }
+enum _BubblePhase { idle, listening, loading, replied }
 
 class PetChatBubble extends StatefulWidget {
   final VoidCallback onDismiss;
@@ -13,238 +13,355 @@ class PetChatBubble extends StatefulWidget {
   State<PetChatBubble> createState() => _PetChatBubbleState();
 }
 
-class _PetChatBubbleState extends State<PetChatBubble> {
-  final _controller = TextEditingController();
+class _PetChatBubbleState extends State<PetChatBubble>
+    with SingleTickerProviderStateMixin {
+  final _ctrl = TextEditingController();
   final _speech = stt.SpeechToText();
-  BubbleState _state = BubbleState.idle;
-  String _replyText = '';
+  _BubblePhase _phase = _BubblePhase.idle;
+  String _reply = '';
   bool _speechAvailable = false;
+
+  // Ellipsis dots animation
+  late final AnimationController _dots;
 
   @override
   void initState() {
     super.initState();
+    _dots = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
     _initSpeech();
   }
 
   Future<void> _initSpeech() async {
     _speechAvailable = await _speech.initialize();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
-  Future<void> _toggleListening() async {
+  Future<void> _toggleListen() async {
     if (!_speechAvailable) return;
     if (_speech.isListening) {
       await _speech.stop();
-      setState(() => _state = BubbleState.idle);
+      setState(() => _phase = _BubblePhase.idle);
     } else {
       setState(() {
-        _state = BubbleState.listening;
-        _controller.clear();
+        _phase = _BubblePhase.listening;
+        _ctrl.clear();
       });
-      await _speech.listen(onResult: (result) {
-        setState(() => _controller.text = result.recognizedWords);
+      await _speech.listen(onResult: (r) {
+        if (mounted) setState(() => _ctrl.text = r.recognizedWords);
       });
     }
   }
 
   Future<void> _send() async {
-    final text = _controller.text.trim();
+    final text = _ctrl.text.trim();
     if (text.isEmpty) return;
     if (_speech.isListening) await _speech.stop();
-
-    setState(() => _state = BubbleState.loading);
-    final response = await AgentService.instance.process(text);
-    setState(() {
-      _state = BubbleState.replied;
-      _replyText = response.reply;
+    setState(() => _phase = _BubblePhase.loading);
+    final resp = await AgentService.instance.process(text);
+    if (mounted) setState(() {
+      _phase = _BubblePhase.replied;
+      _reply = resp.reply;
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl.dispose();
+    _dots.dispose();
     _speech.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CustomPaint(
-          painter: _BubblePainter(),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-            child: _buildContent(),
-          ),
-        ),
-      ],
+    return Material(
+      color: Colors.transparent,
+      child: _Bubble(child: _body()),
     );
   }
 
-  Widget _buildContent() {
-    if (_state == BubbleState.loading) {
-      return SizedBox(
-        width: 200,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Thinking…', style: _textStyle()),
-          const SizedBox(height: 10),
-          const LinearProgressIndicator(
-            backgroundColor: Color(0xFFD6EAFB),
-            valueColor: AlwaysStoppedAnimation(Color(0xFF4A90C4)),
-          ),
-        ]),
-      );
+  Widget _body() {
+    switch (_phase) {
+      case _BubblePhase.loading:
+        return _LoadingDots(anim: _dots);
+      case _BubblePhase.replied:
+        return _ReplyView(text: _reply, onDismiss: widget.onDismiss);
+      case _BubblePhase.listening:
+      case _BubblePhase.idle:
+        return _InputView(
+          ctrl: _ctrl,
+          isListening: _phase == _BubblePhase.listening,
+          speechAvailable: _speechAvailable,
+          onListen: _toggleListen,
+          onSend: _send,
+        );
     }
+  }
+}
 
-    if (_state == BubbleState.replied) {
-      return SizedBox(
-        width: 220,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(_replyText,
-              style: _textStyle(), textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: widget.onDismiss,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4A90C4),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('Done',
-                  style: _textStyle().copyWith(
-                      color: Colors.white, fontWeight: FontWeight.w700)),
-            ),
+// ── Bubble shell ──────────────────────────────────────────────────────────────
+
+class _Bubble extends StatelessWidget {
+  final Widget child;
+  const _Bubble({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 280),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF89C4EE).withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
-        ]),
-      );
-    }
-
-    // idle / listening
-    return SizedBox(
-      width: 240,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+        border: Border.all(color: const Color(0xFFBEDEF7), width: 1.5),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Text(
-            _state == BubbleState.listening
-                ? 'Listening…'
-                : 'What can I help you with?',
-            style: _textStyle().copyWith(fontWeight: FontWeight.w700),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+            child: child,
           ),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                style: _textStyle(size: 13),
-                decoration: InputDecoration(
-                  hintText: 'Type or tap mic…',
-                  hintStyle: _textStyle(size: 13)
-                      .copyWith(color: const Color(0xFF88AACB)),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFA8D4F5)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF4A90C4)),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  isDense: true,
-                ),
-                onSubmitted: (_) => _send(),
+          // Tail pointing down
+          Positioned(
+            bottom: -12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: CustomPaint(
+                size: const Size(20, 12),
+                painter: _TailPainter(),
               ),
             ),
-            const SizedBox(width: 6),
-            _IconBtn(
-              icon: _state == BubbleState.listening
-                  ? Icons.stop_circle_outlined
-                  : Icons.mic,
-              color: _state == BubbleState.listening
-                  ? Colors.red
-                  : const Color(0xFF4A90C4),
-              onTap: _toggleListening,
-            ),
-            const SizedBox(width: 4),
-            _IconBtn(
-              icon: Icons.send_rounded,
-              color: const Color(0xFF4A90C4),
-              onTap: _send,
-            ),
-          ]),
+          ),
         ],
       ),
     );
   }
-
-  TextStyle _textStyle({double size = 14}) => GoogleFonts.epilogue(
-        fontSize: size,
-        color: const Color(0xFF1A3550),
-      );
 }
 
-class _IconBtn extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  const _IconBtn(
-      {required this.icon, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-      );
-}
-
-// Speech bubble with tail pointing downward
-class _BubblePainter extends CustomPainter {
+class _TailPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    const r = 16.0;
-    const tailH = 14.0;
-    final w = size.width;
-    final h = size.height - tailH;
-    final cx = w / 2;
-
     final path = Path()
-      ..moveTo(r, 0)
-      ..lineTo(w - r, 0)
-      ..quadraticBezierTo(w, 0, w, r)
-      ..lineTo(w, h - r)
-      ..quadraticBezierTo(w, h, w - r, h)
-      ..lineTo(cx + 10, h)
-      ..lineTo(cx, h + tailH)
-      ..lineTo(cx - 10, h)
-      ..lineTo(r, h)
-      ..quadraticBezierTo(0, h, 0, h - r)
-      ..lineTo(0, r)
-      ..quadraticBezierTo(0, 0, r, 0)
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
       ..close();
-
     canvas.drawPath(path, Paint()..color = Colors.white);
     canvas.drawPath(
       path,
       Paint()
-        ..color = const Color(0xFFA8D4F5)
+        ..color = const Color(0xFFBEDEF7)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
   }
 
   @override
-  bool shouldRepaint(_BubblePainter old) => false;
+  bool shouldRepaint(_TailPainter _) => false;
+}
+
+// ── Sub-views ─────────────────────────────────────────────────────────────────
+
+class _InputView extends StatelessWidget {
+  final TextEditingController ctrl;
+  final bool isListening;
+  final bool speechAvailable;
+  final VoidCallback onListen;
+  final VoidCallback onSend;
+
+  const _InputView({
+    required this.ctrl,
+    required this.isListening,
+    required this.speechAvailable,
+    required this.onListen,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Text('🐾', style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Text(
+            isListening ? 'Listening…' : 'How can I help?',
+            style: GoogleFonts.epilogue(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1A4A6E),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F8FF),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isListening
+                  ? const Color(0xFF4A90C4)
+                  : const Color(0xFFBEDEF7),
+            ),
+          ),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                controller: ctrl,
+                style: GoogleFonts.epilogue(
+                    fontSize: 13, color: const Color(0xFF1A3550)),
+                decoration: InputDecoration(
+                  hintText: 'Add gym at 6pm…',
+                  hintStyle: GoogleFonts.epilogue(
+                      fontSize: 13, color: const Color(0xFFAAC8E0)),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  isDense: true,
+                ),
+                onSubmitted: (_) => onSend(),
+              ),
+            ),
+            if (speechAvailable)
+              _CircleBtn(
+                icon: isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                color: isListening ? Colors.red : const Color(0xFF4A90C4),
+                onTap: onListen,
+                size: 32,
+              ),
+            _CircleBtn(
+              icon: Icons.send_rounded,
+              color: const Color(0xFF4A90C4),
+              onTap: onSend,
+              size: 32,
+            ),
+            const SizedBox(width: 4),
+          ]),
+        ),
+      ],
+    );
+  }
+}
+
+class _LoadingDots extends StatelessWidget {
+  final Animation<double> anim;
+  const _LoadingDots({required this.anim});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (_, __) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (i) {
+            final phase = (anim.value - i / 3).remainder(1.0);
+            final scale = 0.5 + 0.5 * (1 - (phase * 2 - 1).abs().clamp(0, 1));
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF89C4EE),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+class _ReplyView extends StatelessWidget {
+  final String text;
+  final VoidCallback onDismiss;
+  const _ReplyView({required this.text, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          text,
+          style: GoogleFonts.epilogue(
+              fontSize: 13, color: const Color(0xFF1A3550), height: 1.45),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 14),
+        GestureDetector(
+          onTap: onDismiss,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 28, vertical: 9),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF5BA8D8), Color(0xFF3A80B8)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4A90C4).withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text('Done ✓',
+                style: GoogleFonts.epilogue(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CircleBtn extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final double size;
+  const _CircleBtn(
+      {required this.icon,
+      required this.color,
+      required this.onTap,
+      required this.size});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: size,
+          height: size,
+          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: size * 0.55),
+        ),
+      );
 }
