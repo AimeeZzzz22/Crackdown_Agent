@@ -126,8 +126,10 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
                   widthFactor: isHiding ? _peekVisible / _petSize : null,
                   child: GestureDetector(
                     onTap: _petState == _PetState.hiding ? _onPetTap : null,
-                    child: Transform.scale(
-                      scale: scale,
+                    child: Opacity(
+                      opacity: isHiding
+                          ? 0.55 + 0.45 * _breathe.value  // gentle pulse while hiding
+                          : 0.88,                          // mostly solid when active
                       child: SizedBox(
                         width: _petSize,
                         height: _petSize,
