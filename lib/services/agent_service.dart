@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'app_state.dart';
 
@@ -14,10 +13,11 @@ class AgentService {
   AgentService._();
   static final AgentService instance = AgentService._();
 
-  static const _model = 'claude-sonnet-4-6';
-  static const _endpoint = 'https://api.anthropic.com/v1/messages';
+  // ── Set this to your Vercel deployment URL after deploying ─────────────────
+  // e.g. 'https://crackdown-agent-xyz.vercel.app/api/chat'
+  static const _proxyUrl = 'https://crackdown-agent.vercel.app/api/chat';
 
-  String get _apiKey => dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+  static const _model = 'claude-sonnet-4-6';
 
   Future<AgentResponse> process(String userMessage) async {
     final state = AppState.instance;
@@ -60,12 +60,8 @@ Parse relative dates like "tomorrow", "next Monday" relative to today ($dateStr)
 
     try {
       final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey,
-          'anthropic-version': '2023-06-01',
-        },
+        Uri.parse(_proxyUrl),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'model': _model,
           'max_tokens': 512,
