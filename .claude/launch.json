@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "crackdown-agent",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "9123", "--directory", "/Users/aimeez/Crackdown_Agent/build/web"],
+      "port": 9123
+    }
+  ]
+}
