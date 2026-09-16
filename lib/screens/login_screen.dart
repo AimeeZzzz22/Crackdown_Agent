@@ -56,6 +56,15 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _handleDemoLogin() {
+    AuthService.instance.signInAsDemo();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (_) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,12 +211,51 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                _DemoButton(onTap: _handleDemoLogin),
                 const SizedBox(height: 32),
                   ],
                 ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DemoButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _DemoButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white38, width: 1.5),
+          borderRadius: BorderRadius.circular(14),
+          color: Colors.white10,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Text('⚡', style: TextStyle(fontSize: 16)),
+            SizedBox(width: 8),
+            Text(
+              'Try Demo — skip sign in',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
       ),
     );

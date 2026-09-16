@@ -3,8 +3,15 @@ class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
-  final List<_User> _users = [];
+  final List<_User> _users = [
+    _User(username: 'demo', email: 'demo@crackdown.app', password: 'demo123'),
+  ];
   _User? _currentUser;
+
+  /// Instantly log in as the demo account — no credentials needed.
+  void signInAsDemo() {
+    _currentUser = _users.first;
+  }
 
   _User? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
