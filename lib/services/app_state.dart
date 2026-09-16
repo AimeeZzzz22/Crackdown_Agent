@@ -201,6 +201,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  GoalModel createGoal({
+    required String name,
+    required Color color,
+    List<String> reasons = const [],
+  }) {
+    return GoalModel(
+      name: name,
+      color: color,
+      timePercent: 0.0,
+      taskPercent: 0.0,
+      endDate: '',
+      streakDays: 0,
+      reasons: reasons,
+      tasks: [],
+      inspirationTexts: [],
+      chartData: [0.0],
+    );
+  }
+
   /// Get all todos that belong to a specific goal name
   List<TodoItem> todosForGoal(String goalName) =>
       todos.where((t) => t.goalName == goalName).toList();

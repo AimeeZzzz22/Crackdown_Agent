@@ -5,6 +5,7 @@ import 'profile_screen.dart';
 import 'planning_screen.dart';
 import 'setting_screen.dart';
 import '../theme/colors.dart';
+import '../widgets/line_pet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,9 +27,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _tabs,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: _tabs,
+          ),
+          const LinePet(),
+        ],
       ),
       bottomNavigationBar: _HomeNavBar(
         currentIndex: _currentIndex,
