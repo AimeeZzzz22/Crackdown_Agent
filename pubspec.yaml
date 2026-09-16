@@ -37,6 +37,7 @@ dependencies:
   google_fonts: ^6.2.1
   http: ^1.2.0
   speech_to_text: ^7.0.0
+  flutter_svg: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -60,7 +61,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # assets:
+  assets:
+    - assets/pet_full.svg
+    - assets/pet_peek.svg
+  # other assets:
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

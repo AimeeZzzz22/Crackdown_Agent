@@ -1,6 +1,5 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'line_pet_painter.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'pet_chat_bubble.dart';
 
 enum _PetState { hiding, active }
@@ -17,14 +16,10 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
 
   late final AnimationController _breathe; // slow idle wobble
   late final AnimationController _slide;   // hiding ↔ active transition
-  late final AnimationController _blink;   // eye blink
   late final AnimationController _bubble;  // bubble fade-in
 
   late final Animation<double> _slideAnim;
   late final Animation<double> _bubbleAnim;
-
-  double _eyeOpen = 1.0;
-  final _rng = Random();
 
   static const _petSize = 130.0;
   static const _peekVisible = 48.0; // px visible when hiding
@@ -44,42 +39,17 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
     );
     _slideAnim = CurvedAnimation(parent: _slide, curve: Curves.easeOutBack);
 
-    _blink = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 120),
-    )
-      ..addStatusListener(_onBlinkStatus)
-      ..addListener(() => setState(() => _eyeOpen = 1.0 - _blink.value));
-
     _bubble = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
     _bubbleAnim = CurvedAnimation(parent: _bubble, curve: Curves.easeOut);
-
-    _scheduleNextBlink();
-  }
-
-  void _scheduleNextBlink() {
-    final delay = Duration(milliseconds: 2500 + _rng.nextInt(3000));
-    Future.delayed(delay, () {
-      if (mounted) _blink.forward();
-    });
-  }
-
-  void _onBlinkStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed) {
-      _blink.reverse().then((_) {
-        if (mounted) _scheduleNextBlink();
-      });
-    }
   }
 
   @override
   void dispose() {
     _breathe.dispose();
     _slide.dispose();
-    _blink.dispose();
     _bubble.dispose();
     super.dispose();
   }
@@ -162,12 +132,11 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
                       child: SizedBox(
                         width: _petSize,
                         height: _petSize,
-                        child: CustomPaint(
-                          painter: LinePetPainter(
-                            animPhase: _breathe.value,
-                            eyeOpen: _eyeOpen,
-                            isActive: _petState == _PetState.active,
-                          ),
+                        child: SvgPicture.asset(
+                          _petState == _PetState.active
+                              ? 'assets/pet_full.svg'
+                              : 'assets/pet_peek.svg',
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
