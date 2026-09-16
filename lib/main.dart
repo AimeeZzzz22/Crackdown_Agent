@@ -5,6 +5,8 @@ import 'screens/home_screen.dart';
 import 'services/auth_service.dart';
 
 void main() {
+  // Auto-login with demo account on web for quick preview
+  if (kIsWeb) AuthService.instance.signInAsDemo();
   runApp(const CrackdownApp());
 }
 

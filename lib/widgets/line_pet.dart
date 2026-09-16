@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'pet_chat_bubble.dart';
 
 enum _PetState { hiding, active }
@@ -79,8 +78,9 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
       builder: (context, _) {
         final t = _slideAnim.value;
 
-        // Hiding: mostly off right edge, vertically at 55%
-        final hideX = screenW - _peekVisible;
+        // Hiding: pet right edge flush with screen right, clipped to _peekVisible px
+        // position left so right edge = screenW → left = screenW - petSize
+        final hideX = screenW - _petSize;
         final hideY = screenH * 0.52 - _petSize / 2;
 
         // Active: horizontally centered, above nav bar
@@ -90,10 +90,9 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         final petX = hideX + (activeX - hideX) * t;
         final petY = hideY + (activeY - hideY) * t;
 
-        // Subtle bounce scale when entering
-        final scale = _petState == _PetState.hiding
-            ? 1.0
-            : 0.85 + 0.15 * _slideAnim.value;
+        final scale = 1.0;
+
+        final isHiding = t < 0.05;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -121,10 +120,10 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
               top: petY,
               child: ClipRect(
                 child: Align(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: t < 0.05
-                      ? _peekVisible / _petSize // clip to peek when hiding
-                      : null,
+                  // Hiding: show right side of image (character face peeks in)
+                  // Active: show full image centered
+                  alignment: isHiding ? Alignment.centerRight : Alignment.center,
+                  widthFactor: isHiding ? _peekVisible / _petSize : null,
                   child: GestureDetector(
                     onTap: _petState == _PetState.hiding ? _onPetTap : null,
                     child: Transform.scale(
@@ -132,10 +131,8 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
                       child: SizedBox(
                         width: _petSize,
                         height: _petSize,
-                        child: SvgPicture.asset(
-                          _petState == _PetState.active
-                              ? 'assets/pet_full.svg'
-                              : 'assets/pet_peek.svg',
+                        child: Image.asset(
+                          'assets/pet_full.png',
                           fit: BoxFit.contain,
                         ),
                       ),
