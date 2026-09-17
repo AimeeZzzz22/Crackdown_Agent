@@ -98,10 +98,14 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
 
         final opacity = isHiding ? 0.35 + 0.25 * _breathe.value : 0.28;
 
+        // 1.svg = full body (conversation mode), 2.svg = peek body (hiding mode)
         final petImage = SizedBox(
           width: _petSize,
           height: _petSize,
-          child: Image.asset('assets/pet_full.png', fit: BoxFit.contain),
+          child: Image.asset(
+            isHiding ? 'assets/pet_peek.png' : 'assets/pet_full.png',
+            fit: BoxFit.contain,
+          ),
         );
 
         return Stack(
