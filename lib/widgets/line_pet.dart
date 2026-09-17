@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'pet_chat_bubble.dart';
 
@@ -5,7 +6,6 @@ enum _PetState { hiding, active }
 
 class LinePet extends StatefulWidget {
   const LinePet({super.key});
-
   @override
   State<LinePet> createState() => _LinePetState();
 }
@@ -13,53 +13,62 @@ class LinePet extends StatefulWidget {
 class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
   _PetState _petState = _PetState.hiding;
 
-  late final AnimationController _breathe; // slow idle wobble
-  late final AnimationController _slide;   // hiding ↔ active transition
-  late final AnimationController _bubble;  // bubble fade-in
+  String? _savedReply;
+  DateTime? _dismissedAt;
+  Timer? _clearTimer;
 
+  late final AnimationController _breathe;
+  late final AnimationController _slide;
+  late final AnimationController _bubble;
   late final Animation<double> _slideAnim;
   late final Animation<double> _bubbleAnim;
 
-  static const _petSize = 130.0;
-  static const _peekVisible = 48.0; // px visible when hiding
+  static const _petSize = 200.0;
+  static const _peekVisible = 64.0;
 
   @override
   void initState() {
     super.initState();
-
-    _breathe = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
-
-    _slide = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 480),
-    );
+    _breathe = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+    _slide = AnimationController(vsync: this, duration: const Duration(milliseconds: 480));
     _slideAnim = CurvedAnimation(parent: _slide, curve: Curves.easeOutBack);
-
-    _bubble = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
+    _bubble = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
     _bubbleAnim = CurvedAnimation(parent: _bubble, curve: Curves.easeOut);
   }
 
   @override
   void dispose() {
+    _clearTimer?.cancel();
     _breathe.dispose();
     _slide.dispose();
     _bubble.dispose();
     super.dispose();
   }
 
+  String? get _resumeReply {
+    if (_savedReply == null || _dismissedAt == null) return null;
+    if (DateTime.now().difference(_dismissedAt!) >= const Duration(seconds: 10)) return null;
+    return _savedReply;
+  }
+
   void _onPetTap() {
-    if (_petState != _PetState.hiding) return;
+    if (_petState == _PetState.active) {
+      _dismiss(null);
+      return;
+    }
     setState(() => _petState = _PetState.active);
     _slide.forward().then((_) => _bubble.forward());
   }
 
-  void _dismiss() {
+  void _dismiss(String? lastReply) {
+    _clearTimer?.cancel();
+    if (lastReply != null) {
+      _savedReply = lastReply;
+      _dismissedAt = DateTime.now();
+      _clearTimer = Timer(const Duration(seconds: 10), () {
+        if (mounted) setState(() { _savedReply = null; _dismissedAt = null; });
+      });
+    }
     _bubble.reverse().then((_) {
       _slide.reverse().then((_) {
         if (mounted) setState(() => _petState = _PetState.hiding);
@@ -77,31 +86,31 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
       animation: Listenable.merge([_breathe, _slideAnim, _bubbleAnim]),
       builder: (context, _) {
         final t = _slideAnim.value;
+        final isHiding = _petState == _PetState.hiding;
 
-        // Hiding: pet right edge flush with screen right, clipped to _peekVisible px
-        // position left so right edge = screenW → left = screenW - petSize
         final hideX = screenW - _petSize;
         final hideY = screenH * 0.52 - _petSize / 2;
-
-        // Active: horizontally centered, above nav bar
         final activeX = screenW / 2 - _petSize / 2;
         final activeY = screenH - navBarH - _petSize - 16;
 
-        final petX = hideX + (activeX - hideX) * t;
-        final petY = hideY + (activeY - hideY) * t;
+        final petX = isHiding ? hideX : hideX + (activeX - hideX) * t;
+        final petY = isHiding ? hideY : hideY + (activeY - hideY) * t;
 
-        final scale = 1.0;
+        final opacity = isHiding ? 0.35 + 0.25 * _breathe.value : 0.28;
 
-        final isHiding = t < 0.05;
+        final petImage = SizedBox(
+          width: _petSize,
+          height: _petSize,
+          child: Image.asset('assets/pet_full.png', fit: BoxFit.contain),
+        );
 
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // ── Chat bubble (fades in after pet arrives) ──────────────────────
             if (_petState == _PetState.active)
               Positioned(
                 left: (screenW / 2 - 148).clamp(8.0, screenW - 300.0),
-                top: petY - 195,
+                top: petY - 200,
                 child: FadeTransition(
                   opacity: _bubbleAnim,
                   child: SlideTransition(
@@ -109,38 +118,27 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
                       begin: const Offset(0, 0.15),
                       end: Offset.zero,
                     ).animate(_bubbleAnim),
-                    child: PetChatBubble(onDismiss: _dismiss),
-                  ),
-                ),
-              ),
-
-            // ── Pet ───────────────────────────────────────────────────────────
-            Positioned(
-              left: petX,
-              top: petY,
-              child: ClipRect(
-                child: Align(
-                  // Hiding: show right side of image (character face peeks in)
-                  // Active: show full image centered
-                  alignment: isHiding ? Alignment.centerRight : Alignment.center,
-                  widthFactor: isHiding ? _peekVisible / _petSize : null,
-                  child: GestureDetector(
-                    onTap: _petState == _PetState.hiding ? _onPetTap : null,
-                    child: Opacity(
-                      opacity: isHiding
-                          ? 0.55 + 0.45 * _breathe.value  // gentle pulse while hiding
-                          : 0.88,                          // mostly solid when active
-                      child: SizedBox(
-                        width: _petSize,
-                        height: _petSize,
-                        child: Image.asset(
-                          'assets/pet_full.png',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                    child: PetChatBubble(
+                      initialReply: _resumeReply,
+                      onDismiss: _dismiss,
                     ),
                   ),
                 ),
+              ),
+            Positioned(
+              left: petX,
+              top: petY,
+              child: GestureDetector(
+                onTap: _onPetTap,
+                child: isHiding
+                    ? ClipRect(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          widthFactor: _peekVisible / _petSize,
+                          child: Opacity(opacity: opacity, child: petImage),
+                        ),
+                      )
+                    : Opacity(opacity: opacity, child: petImage),
               ),
             ),
           ],

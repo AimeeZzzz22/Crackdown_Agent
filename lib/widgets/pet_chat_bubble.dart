@@ -6,8 +6,14 @@ import '../services/agent_service.dart';
 enum _BubblePhase { idle, listening, loading, replied }
 
 class PetChatBubble extends StatefulWidget {
-  final VoidCallback onDismiss;
-  const PetChatBubble({super.key, required this.onDismiss});
+  final String? initialReply;
+  final void Function(String? lastReply) onDismiss;
+
+  const PetChatBubble({
+    super.key,
+    required this.onDismiss,
+    this.initialReply,
+  });
 
   @override
   State<PetChatBubble> createState() => _PetChatBubbleState();
@@ -17,11 +23,10 @@ class _PetChatBubbleState extends State<PetChatBubble>
     with SingleTickerProviderStateMixin {
   final _ctrl = TextEditingController();
   final _speech = stt.SpeechToText();
-  _BubblePhase _phase = _BubblePhase.idle;
-  String _reply = '';
+  late _BubblePhase _phase;
+  late String _reply;
   bool _speechAvailable = false;
 
-  // Ellipsis dots animation
   late final AnimationController _dots;
 
   @override
@@ -32,6 +37,15 @@ class _PetChatBubbleState extends State<PetChatBubble>
       duration: const Duration(milliseconds: 900),
     )..repeat();
     _initSpeech();
+
+    // Restore previous conversation if within 10 s
+    if (widget.initialReply != null) {
+      _phase = _BubblePhase.replied;
+      _reply = widget.initialReply!;
+    } else {
+      _phase = _BubblePhase.idle;
+      _reply = '';
+    }
   }
 
   Future<void> _initSpeech() async {
@@ -67,6 +81,8 @@ class _PetChatBubbleState extends State<PetChatBubble>
     });
   }
 
+  void _handleDismiss() => widget.onDismiss(_reply.isNotEmpty ? _reply : null);
+
   @override
   void dispose() {
     _ctrl.dispose();
@@ -88,7 +104,9 @@ class _PetChatBubbleState extends State<PetChatBubble>
       case _BubblePhase.loading:
         return _LoadingDots(anim: _dots);
       case _BubblePhase.replied:
-        return _ReplyView(text: _reply, onDismiss: widget.onDismiss);
+        return _ReplyView(text: _reply, onDismiss: _handleDismiss, onAskMore: () {
+          setState(() { _phase = _BubblePhase.idle; _ctrl.clear(); });
+        });
       case _BubblePhase.listening:
       case _BubblePhase.idle:
         return _InputView(
@@ -131,7 +149,6 @@ class _Bubble extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
             child: child,
           ),
-          // Tail pointing down
           Positioned(
             bottom: -12,
             left: 0,
@@ -195,7 +212,7 @@ class _InputView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Text('🐾', style: const TextStyle(fontSize: 14)),
+          const Text('🐾', style: TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
           Text(
             isListening ? 'Listening…' : 'How can I help?',
@@ -270,7 +287,7 @@ class _LoadingDots extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(3, (i) {
             final phase = (anim.value - i / 3).remainder(1.0);
-            final scale = 0.5 + 0.5 * (1 - (phase * 2 - 1).abs().clamp(0, 1));
+            final scale = 0.5 + 0.5 * (1 - (phase * 2 - 1).abs().clamp(0.0, 1.0));
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Transform.scale(
@@ -295,7 +312,13 @@ class _LoadingDots extends StatelessWidget {
 class _ReplyView extends StatelessWidget {
   final String text;
   final VoidCallback onDismiss;
-  const _ReplyView({required this.text, required this.onDismiss});
+  final VoidCallback onAskMore;
+
+  const _ReplyView({
+    required this.text,
+    required this.onDismiss,
+    required this.onAskMore,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -309,30 +332,51 @@ class _ReplyView extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 14),
-        GestureDetector(
-          onTap: onDismiss,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 28, vertical: 9),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF5BA8D8), Color(0xFF3A80B8)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF4A90C4).withValues(alpha: 0.35),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: onAskMore,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F8FF),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFBEDEF7)),
                 ),
-              ],
+                child: Text('Ask more',
+                    style: GoogleFonts.epilogue(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF4A90C4))),
+              ),
             ),
-            child: Text('Done ✓',
-                style: GoogleFonts.epilogue(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white)),
-          ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onDismiss,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5BA8D8), Color(0xFF3A80B8)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4A90C4).withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Text('Done ✓',
+                    style: GoogleFonts.epilogue(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+              ),
+            ),
+          ],
         ),
       ],
     );
