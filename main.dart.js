@@ -46990,7 +46990,7 @@ if(r){p=f.w
 p===$&&A.a()
 p=p.x
 p===$&&A.a()
-j=0.35+0.25*p}else j=0.28
+j=0.55+0.45*p}else j=1
 p=r?"assets/pet_peek.png":"assets/pet_full.png"
 i=A.c2(new A.zM(A.aT2(g,g,new A.xS(p,g,g)),B.Dh,g),200,200)
 p=A.b([],t.p)
