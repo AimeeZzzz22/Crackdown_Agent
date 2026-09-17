@@ -46990,7 +46990,8 @@ p===$&&A.a()
 p=p.x
 p===$&&A.a()
 k=0.35+0.25*p}else k=0.28
-j=A.c2(new A.zM(A.aT2(h,h,new A.xS("assets/pet_full.png",h,h)),B.Dh,h),200,200)
+p=r?"assets/pet_peek.png":"assets/pet_full.png"
+j=A.c2(new A.zM(A.aT2(h,h,new A.xS(p,h,h)),B.Dh,h),200,200)
 p=A.b([],t.p)
 if(g.d===B.nA){f=B.d.dv(n-148,8,f-300)
 n=g.Q
