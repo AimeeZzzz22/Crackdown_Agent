@@ -99,7 +99,7 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         final petX = isHiding ? hideX : slideStartX + (activeX - slideStartX) * t;
         final petY = isHiding ? hideY : hideY + (activeY - hideY) * t;
 
-        final opacity = isHiding ? 0.35 + 0.25 * _breathe.value : 0.28;
+        final opacity = isHiding ? 0.55 + 0.45 * _breathe.value : 1.0;
 
         // 1.svg = full body (conversation mode), 2.svg = peek body (hiding mode)
         final petImage = SizedBox(
