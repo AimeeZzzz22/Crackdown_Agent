@@ -88,12 +88,15 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         final t = _slideAnim.value;
         final isHiding = _petState == _PetState.hiding;
 
-        final hideX = screenW - _petSize;
+        // Hiding: clip widget's RIGHT edge flush with screen right
+        final hideX = screenW - _peekVisible;
         final hideY = screenH * 0.52 - _petSize / 2;
+        // Slide: full image enters from right edge, slides to center
+        final slideStartX = screenW - _petSize;
         final activeX = screenW / 2 - _petSize / 2;
         final activeY = screenH - navBarH - _petSize - 16;
 
-        final petX = isHiding ? hideX : hideX + (activeX - hideX) * t;
+        final petX = isHiding ? hideX : slideStartX + (activeX - slideStartX) * t;
         final petY = isHiding ? hideY : hideY + (activeY - hideY) * t;
 
         final opacity = isHiding ? 0.35 + 0.25 * _breathe.value : 0.28;
