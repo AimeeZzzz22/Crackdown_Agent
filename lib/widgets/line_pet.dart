@@ -108,7 +108,7 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
           width: _petSize,
           height: _petSize,
           child: ModelViewer(
-            src: 'assets/pet_3d.glb',
+            src: Uri.base.resolve('assets/assets/pet_3d.glb').toString(),
             alt: 'Line pet',
             autoPlay: true,
             autoRotate: !isHiding,
