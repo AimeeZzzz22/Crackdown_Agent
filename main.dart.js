@@ -47525,7 +47525,7 @@ p===$&&A.a()
 p=p.x
 p===$&&A.a()
 j=0.55+0.45*p}else j=1
-i=A.cb(new A.NF(A.akm().Y("assets/assets/pet_3d.glb").k(0),g),200,200)
+i=A.cb(new A.NF(A.akm().Y("models/pet_3d.glb").k(0),g),200,200)
 p=A.b([],t.p)
 if(f.d===B.nB){e=B.d.dt(m-148,8,e-300)
 m=f.Q
