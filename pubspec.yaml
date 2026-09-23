@@ -38,6 +38,7 @@ dependencies:
   http: ^1.2.0
   speech_to_text: ^7.0.0
   flutter_svg: ^2.0.0
+  model_viewer_plus: ^1.10.0
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +67,7 @@ flutter:
     - assets/pet_peek.svg
     - assets/pet_full.png
     - assets/pet_peek.png
+    - assets/pet_3d.glb
   # other assets:
 
   # An image asset can refer to one or more resolution-specific "variants", see

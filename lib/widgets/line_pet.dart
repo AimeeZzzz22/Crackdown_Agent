@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'pet_chat_bubble.dart';
 
 enum _PetState { hiding, active }
@@ -88,10 +89,10 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         final t = _slideAnim.value;
         final isHiding = _petState == _PetState.hiding;
 
-        // Hiding: clip widget's RIGHT edge flush with screen right
+        // Hiding: clip widget right edge flush with screen right
         final hideX = screenW - _peekVisible;
         final hideY = screenH * 0.52 - _petSize / 2;
-        // Slide: full image enters from right edge, slides to center
+        // Active: slide in from right, land centered above nav bar
         final slideStartX = screenW - _petSize;
         final activeX = screenW / 2 - _petSize / 2;
         final activeY = screenH - navBarH - _petSize - 16;
@@ -99,21 +100,33 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         final petX = isHiding ? hideX : slideStartX + (activeX - slideStartX) * t;
         final petY = isHiding ? hideY : hideY + (activeY - hideY) * t;
 
+        // Pulse opacity on outline while hiding; full opacity in active mode
         final opacity = isHiding ? 0.55 + 0.45 * _breathe.value : 1.0;
 
-        // 1.svg = full body (conversation mode), 2.svg = peek body (hiding mode)
-        final petImage = SizedBox(
+        // 3D model viewer — transparent background, auto-rotate when active
+        final petModel = SizedBox(
           width: _petSize,
           height: _petSize,
-          child: Image.asset(
-            isHiding ? 'assets/pet_peek.png' : 'assets/pet_full.png',
-            fit: BoxFit.contain,
+          child: ModelViewer(
+            src: 'assets/pet_3d.glb',
+            alt: 'Line pet',
+            autoPlay: true,
+            autoRotate: !isHiding,
+            autoRotateDelay: 0,
+            rotationPerSecond: '20deg',
+            cameraControls: false,
+            disablePan: true,
+            disableZoom: true,
+            backgroundColor: Colors.transparent,
+            // Keep a fixed camera angle so the character faces forward
+            cameraOrbit: '0deg 75deg 2.5m',
           ),
         );
 
         return Stack(
           clipBehavior: Clip.none,
           children: [
+            // ── Chat bubble ──────────────────────────────────────────────────
             if (_petState == _PetState.active)
               Positioned(
                 left: (screenW / 2 - 148).clamp(8.0, screenW - 300.0),
@@ -132,6 +145,8 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+
+            // ── 3D Pet ───────────────────────────────────────────────────────
             Positioned(
               left: petX,
               top: petY,
@@ -142,10 +157,10 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
                         child: Align(
                           alignment: Alignment.centerRight,
                           widthFactor: _peekVisible / _petSize,
-                          child: Opacity(opacity: opacity, child: petImage),
+                          child: Opacity(opacity: opacity, child: petModel),
                         ),
                       )
-                    : Opacity(opacity: opacity, child: petImage),
+                    : Opacity(opacity: opacity, child: petModel),
               ),
             ),
           ],
