@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
+import 'pet_3d_view.dart';
 import 'pet_chat_bubble.dart';
 
 enum _PetState { hiding, active }
@@ -103,24 +103,12 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         // Pulse opacity on outline while hiding; full opacity in active mode
         final opacity = isHiding ? 0.55 + 0.45 * _breathe.value : 1.0;
 
-        // 3D model viewer — transparent background, auto-rotate when active
+        // 3D pet via direct HtmlElementView — bypasses model_viewer_plus iframe issues
+        final glbUrl = Uri.base.resolve('assets/assets/pet_3d.glb').toString();
         final petModel = SizedBox(
           width: _petSize,
           height: _petSize,
-          child: ModelViewer(
-            src: Uri.base.resolve('assets/assets/pet_3d.glb').toString(),
-            alt: 'Line pet',
-            autoPlay: true,
-            autoRotate: !isHiding,
-            autoRotateDelay: 0,
-            rotationPerSecond: '20deg',
-            cameraControls: false,
-            disablePan: true,
-            disableZoom: true,
-            backgroundColor: Colors.transparent,
-            // Keep a fixed camera angle so the character faces forward
-            cameraOrbit: '0deg 75deg 2.5m',
-          ),
+          child: Pet3DView(glbUrl: glbUrl),
         );
 
         return Stack(
