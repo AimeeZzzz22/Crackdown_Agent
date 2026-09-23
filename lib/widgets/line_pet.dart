@@ -104,7 +104,7 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         final opacity = isHiding ? 0.55 + 0.45 * _breathe.value : 1.0;
 
         // 3D pet via direct HtmlElementView — bypasses model_viewer_plus iframe issues
-        final glbUrl = Uri.base.resolve('assets/assets/pet_3d.glb').toString();
+        final glbUrl = Uri.base.resolve('models/pet_3d.glb').toString();
         final petModel = SizedBox(
           width: _petSize,
           height: _petSize,
