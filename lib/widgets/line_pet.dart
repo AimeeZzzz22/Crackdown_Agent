@@ -108,7 +108,7 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
         final petModel = SizedBox(
           width: _petSize,
           height: _petSize,
-          child: Pet3DView(glbUrl: glbUrl),
+          child: Pet3DView(glbUrl: glbUrl, conversationMode: !isHiding),
         );
 
         return Stack(
@@ -145,10 +145,10 @@ class _LinePetState extends State<LinePet> with TickerProviderStateMixin {
                         child: Align(
                           alignment: Alignment.centerRight,
                           widthFactor: _peekVisible / _petSize,
-                          child: Opacity(opacity: opacity, child: petModel),
+                          child: petModel,
                         ),
                       )
-                    : Opacity(opacity: opacity, child: petModel),
+                    : petModel,
               ),
             ),
           ],
